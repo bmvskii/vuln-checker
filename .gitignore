@@ -19,6 +19,8 @@
 .env.production.local
 
 /reports/*
+/has_vulns/*
+/empty/*
 
 npm-debug.log*
 yarn-debug.log*
