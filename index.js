@@ -3,38 +3,33 @@ const fse = require("fs-extra");
 const extract = require("extract-zip");
 const path = require("path");
 const colors = require("colors");
+const { initFolders, createAndMoveFolder, moveTo} = require('./utils/folder');
 
 const rootFolder = "./reports";
-const emptyReportsFolder = "./empty";
-const withVulnReportsFolder = "./has_vulns";
-
 const filesToSkip = [".DS_Store"];
-
-const moveFolder = (from, to) => {
-  fse.moveSync(from, to, { overwrite: true }, function (err) {
-    if (err) {
-      console.error(err);
-    }
-  });
-};
-
 const emptyReports = [];
+const TIME_FOR_RESTART = 100;
+const ZIP_ENDING = '.zip';
+const TXT_ENDING = '.txt';
 
 try {
+  // STAGE 1 - initialization of folders
+  initFolders();
+
+  // STAGE 2 - unarchive .zip reports
   const archivedReportsFolders = fs
     .readdirSync(rootFolder)
     .filter((entityName) => !filesToSkip.includes(entityName));
 
   if (archivedReportsFolders.length === 0) {
     console.log(colors.red("--- No reports provided. ----"));
-    return;
+    process.exit(1);
   }
 
-  // --- unarchive reports
   archivedReportsFolders.forEach(async (archivedReport) => {
-    if (archivedReport.includes(".zip")) {
+    if (archivedReport.includes(ZIP_ENDING)) {
       try {
-        const [folderName] = archivedReport.split(".zip");
+        const [folderName] = archivedReport.split(ZIP_ENDING);
         const archivedFolderPath = `${rootFolder}/${archivedReport}`;
         const destFolderPath = path.resolve(`${rootFolder}/${folderName}`);
 
@@ -46,31 +41,36 @@ try {
     }
   });
 
+  // STAGE 3 - start checking reports on vulnerabilities
   const runReportsCheck = () => {
+    // Filter zip folders (can exist on this moment) 
     const hasZipFolders = fs
       .readdirSync(rootFolder)
-      .some((entity) => entity.includes("zip"));
+      .some((entity) => entity.includes(ZIP_ENDING));
 
     if (hasZipFolders) {
-      setTimeout(() => { runReportsCheck() }, 100);
+      setTimeout(() => { runReportsCheck() }, TIME_FOR_RESTART);
     } else {
       const reportsFolders = fs
         .readdirSync(rootFolder)
-        .filter(
-          (entityName) => !filesToSkip.includes(entityName) && !entityName.includes("zip")
-        );
+        .filter((name) => !filesToSkip.includes(name) && !name.includes("zip"));
 
+      // STAGE 5 - working with each report
       reportsFolders.forEach((reportFolderName) => {
         const reportFolderPath = `${rootFolder}/${reportFolderName}`;
 
         if (fs.existsSync(reportFolderPath)) {
           const fileName = fs
             .readdirSync(reportFolderPath)
-            .filter((entityName) => entityName.includes(".txt"));
-          const reportFilePath = path.resolve(`${reportFolderPath}/${fileName}`);
+            .filter((entityName) => entityName.includes(TXT_ENDING));
+          const reportFilePath = path.resolve(
+            `${reportFolderPath}/${fileName}`
+          );
           const reportContent = fs.readFileSync(reportFilePath, "utf-8");
           const regExpPattern = new RegExp(/(Info|Medium|High|Critical): \d*/g);
-          const otherVulnsPatterns = new RegExp(/(auth|login|Siemens|simatic|WinCC|PLC|SIWACON|SIwatool|ПЛК|S7-1200|S7-1500|S7-300|S7-400|Profiner|profibus)/gi);
+          const otherVulnsPatterns = new RegExp(
+            /(auth|login|Siemens|simatic|WinCC|PLC|SIWACON|SIwatool|ПЛК|S7-1200|S7-1500|S7-300|S7-400|Profiner|profibus)/gi
+          );
           const otherVulnsMatch = reportContent.match(otherVulnsPatterns) || [];
           const vulnerabilities = {
             Medium: 0,
@@ -79,29 +79,40 @@ try {
             Info: 0,
             Other: 0,
           };
+        
+          // STAGE 6 - run RegExps 
 
+          vulnerabilities["Other"] = otherVulnsMatch.length;
           reportContent.match(regExpPattern).forEach((vuln) => {
             const [type, amount] = vuln.split(": ");
             vulnerabilities[type] += +amount || 0;
           });
 
-          vulnerabilities["Other"] = otherVulnsMatch.length;
-
-          const hasVulns = Object.values(vulnerabilities).reduce((acc, curr) => acc + curr, 0) !== 0;
-          const from = `${rootFolder}/${reportFolderName}`;
-          const to = `${hasVulns ? withVulnReportsFolder : emptyReportsFolder}/${reportFolderName}`;
+          const hasVulns = Object
+            .values(vulnerabilities)
+            .reduce((acc, curr) => acc + curr, 0) !== 0;
 
           if (!hasVulns) {
             emptyReports.push(reportFolderName);
+          } 
+
+          // STAGE 7 - sort reports to folders
+
+          const from = `${rootFolder}/${reportFolderName}`;
+          for (const vulnLevel of ["Critical", "High", "Medium", "Info", "Other"]) {
+            if (vulnerabilities[vulnLevel]) {
+              createAndMoveFolder({ from, reportFolderName, vulnLevel });
+              return;
+            }
           }
 
-          moveFolder(from, to);
+          moveTo(from, `./empty/${reportFolderName}`);
         }
       });
     }
   };
 
-  setTimeout(() => { runReportsCheck(); }, 100);
+  setTimeout(() => { runReportsCheck() }, TIME_FOR_RESTART);
 } catch (error) {
   console.log(error);
 }
