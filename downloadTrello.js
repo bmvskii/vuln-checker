@@ -24,19 +24,39 @@ const getAttachments = (id) => {
 }
 
 const downloadAttachments = (url, dest) => {
-    return new Promise((res, _) => {
-        const file = fs.createWriteStream(dest);
-        https.get(url, function (response) {
-            response.pipe(file);
-            file.on('finish', function () {
-                file.close(() => res());
+    return new Promise((resolve, reject) => {
+        const download = fs.createWriteStream(dest);
+
+        const _url = url + '?key=' + API_Key + '&token=' + API_Token;
+        https.get(_url, {
+            headers: {
+                Authorization:
+                    'OAuth oauth_consumer_key="' +
+                    API_Key +
+                    '", oauth_token="' +
+                    API_Token +
+                    '"',
+            },
+        }, (res) => {
+            res.pipe(download);
+            download.on('finish', function () {
+                download.close((err) => {
+                    if (!err) {
+                        resolve();
+                    } else {
+                        reject(err);
+                    }
+                });
+            }).on('error', (err) => {
+                fs.unlink(dest);
             });
         });
+
     });
 }
 
 const getCards = (id) => {
-    return new Promise((res, rej)=>{
+    return new Promise((res, rej) => {
         t.get(`/1/lists/${id}/cards`, async (err, data) => {
             if (err) rej(err);
             res(data);
@@ -44,12 +64,12 @@ const getCards = (id) => {
     });
 }
 
-(async ()=>{
+(async () => {
     let cards = await getCards(toCheckEasyId);
     cards = cards.filter(({ idMembers }) => idMembers.length == 0);
-    
+
     console.log('Cards: ', cards.length);
-    
+
     for (const i of cards) {
         const id = i.id;
         const attachments = await getAttachments(id);
