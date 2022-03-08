@@ -5,7 +5,7 @@ const path = require("path");
 const colors = require("colors");
 const { initFolders, createAndMoveFolder, moveTo} = require('./utils/folder');
 
-const rootFolder = "./reports";
+const rootFolder = path.join(__dirname, "../reports");
 const filesToSkip = [".DS_Store"];
 const emptyReports = [];
 const TIME_FOR_RESTART = 100;

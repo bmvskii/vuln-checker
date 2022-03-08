@@ -20,7 +20,8 @@
 prod.env
 
 /reports/*
-/has_vulns/*
+/reports2/*
+/vulns/*
 /empty/*
 
 
