@@ -3,16 +3,15 @@
 const Trello = require("node-trello");
 const https = require('https');
 const fs = require('fs');
+const config = require('./utils/config');
+const path = require("path");
 
-const API_Key = "----";
-const API_Token = "----"
+const API_Key = config.TRELLO_API_Key;
+const API_Token = config.TRELLO_API_Token;
 
 const t = new Trello(API_Key, API_Token);
 
-const boardId = "djwu7zzB";
-
 const toCheckEasyId = "621dff85204ca28580257bf4";
-const emptyId = "621e428b28f14b610386b61f";
 
 const getAttachments = (id) => {
     return new Promise((res, rej) => {
@@ -64,7 +63,16 @@ const getCards = (id) => {
     });
 }
 
+const insureStructure = () => {
+    for (const i of ['reports', 'empty']) {
+        if (fs.existsSync(i)) continue;
+        fs.mkdirSync(i);
+    }
+}
+
 (async () => {
+    insureStructure();
+
     let cards = await getCards(toCheckEasyId);
     cards = cards.filter(({ idMembers }) => idMembers.length == 0);
 
@@ -75,7 +83,8 @@ const getCards = (id) => {
         const attachments = await getAttachments(id);
         if (attachments.length != 0) {
             const { url, name } = attachments[0];
-            await downloadAttachments(url, `${__dirname}/reports/${name}`);
+            const dest =  path.join(__dirname, '../reports', name);
+            await downloadAttachments(url, dest);
             console.log("-->");
         }
         else {

@@ -1,16 +1,14 @@
 // API docs https://developer.atlassian.com/cloud/trello/rest/api-group-lists/
 
 const Trello = require("node-trello");
-const https = require('https');
 const path = require('path');
 const fs = require('fs-extra');
+const config = require('./utils/config');
 
-const API_Key = "----";
-const API_Token = "----"
+const API_Key = config.TRELLO_API_Key;
+const API_Token = config.TRELLO_API_Token;
 
 const t = new Trello(API_Key, API_Token);
-
-const boardId = "djwu7zzB";
 
 const toCheckEasyId = "621dff85204ca28580257bf4";
 const emptyId = "621e428b28f14b610386b61f";
