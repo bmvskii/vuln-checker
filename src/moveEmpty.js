@@ -23,7 +23,7 @@ const getCards = (id) => {
 }
 
 const getEmpty = async () => {
-    const directoryPath = path.join(__dirname, 'empty');
+    const directoryPath = path.join(__dirname, '../empty');
     //passsing directoryPath and callback function
     const files = await fs.readdir(directoryPath)
     return files;
